@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { supabase } from '../lib/supabase.js';
 import {
     Terminal,
     Zap,
@@ -769,6 +770,7 @@ export default function App() {
 
     // Verified Profile State (Persisted in localStorage so Indraraj can live-edit)
     const [profile, setProfile] = useState(DEFAULT_PROFILE_DATA);
+   
     // Live Customizer Drawer State
     const [showConfigDrawer, setShowConfigDrawer] = useState(false);
     const [copiedJson, setCopiedJson] = useState(false);
@@ -1306,28 +1308,66 @@ const handleResetQuests = () => {
 const [projects, setProjects] = useState(DEFAULT_PROJECTS_DATA);
 // Load saved portfolio data from localStorage
 useEffect(() => {
-    try {
-        const savedProfile = localStorage.getItem('indraraj_hud_profile_v3');
-        const savedSkills = localStorage.getItem('indraraj_hud_skills_v3');
-        const savedPlaylist = localStorage.getItem('indraraj_hud_playlist_v3');
-        const savedQuests = localStorage.getItem('indraraj_hud_quests_v3');
-        const savedProjects = localStorage.getItem('indraraj_hud_projects_v3');
+    const loadPortfolioData = async () => {
+        try {
+            const savedProfile = localStorage.getItem('indraraj_hud_profile_v3');
+            const savedSkills = localStorage.getItem('indraraj_hud_skills_v3');
+            const savedPlaylist = localStorage.getItem('indraraj_hud_playlist_v3');
+            const savedQuests = localStorage.getItem('indraraj_hud_quests_v3');
+            const savedProjects = localStorage.getItem('indraraj_hud_projects_v3');
 
-        if (savedProfile) {
-            setProfile({
-                ...DEFAULT_PROFILE_DATA,
-                ...JSON.parse(savedProfile)
-            });
+            if (savedProfile) {
+                setProfile({
+                    ...DEFAULT_PROFILE_DATA,
+                    ...JSON.parse(savedProfile)
+                });
+            }
+            if (savedSkills) setSkills(JSON.parse(savedSkills));
+            if (savedPlaylist) setPlaylist(JSON.parse(savedPlaylist));
+            if (savedQuests) setQuests(JSON.parse(savedQuests));
+            if (savedProjects) setProjects(JSON.parse(savedProjects));
+
+            // Load latest profile from Supabase
+            const { data, error } = await supabase
+                .from('portfolio_content')
+                .select('content')
+                .eq('id', 'main')
+                .single();
+
+            if (error) {
+                console.error('Supabase profile loading error:', error);
+            } else if (data?.content) {
+                const saved = data.content;
+
+                setProfile({
+                    ...DEFAULT_PROFILE_DATA,
+                    ...(saved.profile || {})
+                });
+
+                setSkills(
+                    Array.isArray(saved.skills) ? saved.skills : DEFAULT_SKILLS_DATA
+                );
+
+                setProjects(
+                    Array.isArray(saved.projects) ? saved.projects : DEFAULT_PROJECTS_DATA
+                );
+
+                setPlaylist(
+                    Array.isArray(saved.playlist) ? saved.playlist : DEFAULT_PLAYLIST_DATA
+                );
+
+                setQuests(
+                    Array.isArray(saved.quests) ? saved.quests : DEFAULT_QUESTS_DATA
+                );
+
+                console.log('ALL PORTFOLIO DATA FROM SUPABASE:', saved);
+            }
+        } catch (error) {
+            console.error('Portfolio data loading error:', error);
         }
+    };
 
-        if (savedSkills) setSkills(JSON.parse(savedSkills));
-        if (savedPlaylist) setPlaylist(JSON.parse(savedPlaylist));
-        if (savedQuests) setQuests(JSON.parse(savedQuests));
-        if (savedProjects) setProjects(JSON.parse(savedProjects));
-
-    } catch (error) {
-        console.error('Error loading portfolio data:', error);
-    }
+    loadPortfolioData();
 }, []);
 const [showProjectEditorModal, setShowProjectEditorModal] = useState(false);
 const [editingProjectId, setEditingProjectId] = useState(null);
@@ -1678,22 +1718,7 @@ const missionTitles = [
 const [typedText, setTypedText] = useState('');
 const [titleIdx, setTitleIdx] = useState(0);
 
-useEffect(() => {
-    let charIdx = 0;
-    const currentString = missionTitles[titleIdx];
-    const typeInterval = setInterval(() => {
-        if (charIdx <= currentString.length) {
-            setTypedText(currentString.slice(0, charIdx));
-            charIdx++;
-        } else {
-            clearInterval(typeInterval);
-            setTimeout(() => {
-                setTitleIdx((prev) => (prev + 1) % missionTitles.length);
-            }, 2200);
-        }
-    }, 75);
-    return () => clearInterval(typeInterval);
-}, [titleIdx]);
+
 
 // Smooth Scroll Helper
 const scrollToSection = (id, label, contextMsg) => {
